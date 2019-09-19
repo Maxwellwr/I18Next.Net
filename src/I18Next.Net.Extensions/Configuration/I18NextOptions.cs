@@ -1,4 +1,6 @@
-namespace I18Next.Net.Extensions.Builder
+using System.Collections.Generic;
+
+namespace I18Next.Net.Extensions.Configuration
 {
     public class I18NextOptions
     {
@@ -7,5 +9,7 @@ namespace I18Next.Net.Extensions.Builder
         public string DefaultNamespace { get; set; } = "translation";
 
         public bool DetectLanguageOnEachTranslation { get; set; }
+
+        public IList<string> FallbackLanguages { get; set; } = new List<string>();
     }
 }

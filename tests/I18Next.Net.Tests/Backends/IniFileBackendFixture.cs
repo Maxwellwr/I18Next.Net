@@ -20,10 +20,12 @@ namespace I18Next.Net.Tests.Backends
         private ITranslationTree _tree;
 
         [Test]
-        public void LoadNamespaceAsync_RootKeys_ShouldProvideCorrectTranslations()
+        public async Task LoadNamespaceAsync_ExtractLanguagePart_ShouldProvideTranslationsForOnlyTheLanguagePart()
         {
-            _tree.Should().NotBeNull();
-            
+            var tree = await _backend.LoadNamespaceAsync("de-DE", "test");
+
+            tree.Should().NotBeNull();
+
             _tree.GetValue("Value1", null).Should().Be("Translated value 1");
             _tree.GetValue("Value2", null).Should().Be("Translated value 2");
             _tree.GetValue("Value3", null).Should().Be("  Translated value 3   ");
@@ -36,14 +38,14 @@ namespace I18Next.Net.Tests.Backends
         public void LoadNamespaceAsync_NestedKeys_ShouldProvideCorrectTranslations()
         {
             _tree.Should().NotBeNull();
-            
+
             _tree.GetValue("SectionA.Value1", null).Should().Be("Translated value 1");
             _tree.GetValue("SectionA.Value2", null).Should().Be("Translated value 2");
             _tree.GetValue("SectionA.Value3", null).Should().Be("  Translated value 3   ");
             _tree.GetValue("SectionA.Value4", null).Should().Be("Translated value 4");
             _tree.GetValue("SectionA.Value5", null).Should().Be("Translated value 5");
             _tree.GetValue("SectionA.Value6", null).Should().Be("Translated value 6");
-            
+
             _tree.GetValue("SectionB.SubSectionA.Value1", null).Should().Be("Translated value 1");
             _tree.GetValue("SectionB.SubSectionA.Value2", null).Should().Be("Translated value 2");
             _tree.GetValue("SectionB.SubSectionA.Value3", null).Should().Be("  Translated value 3   ");
@@ -53,12 +55,10 @@ namespace I18Next.Net.Tests.Backends
         }
 
         [Test]
-        public async Task LoadNamespaceAsync_ExtractLanguagePart_ShouldProvideTranslationsForOnlyTheLanguagePart()
+        public void LoadNamespaceAsync_RootKeys_ShouldProvideCorrectTranslations()
         {
-            var tree = await _backend.LoadNamespaceAsync("de-DE", "test");
-            
-            tree.Should().NotBeNull();
-            
+            _tree.Should().NotBeNull();
+
             _tree.GetValue("Value1", null).Should().Be("Translated value 1");
             _tree.GetValue("Value2", null).Should().Be("Translated value 2");
             _tree.GetValue("Value3", null).Should().Be("  Translated value 3   ");

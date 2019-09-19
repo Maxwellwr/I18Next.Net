@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 
 namespace I18Next.Net.Plugins
@@ -7,6 +8,8 @@ namespace I18Next.Net.Plugins
     {
         List<IPostProcessor> PostProcessors { get; }
 
-        Task<string> TranslateAsync(string language, string defaultNamespace, string key, IDictionary<string, object> args);
+        event EventHandler<MissingKeyEventArgs> MissingKey;
+
+        Task<string> TranslateAsync(string language, string key, IDictionary<string, object> args, TranslationOptions options);
     }
 }

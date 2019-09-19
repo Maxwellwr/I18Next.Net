@@ -65,13 +65,13 @@ namespace I18Next.Net.Plugins
         }
 
         /// <inheritdoc />
-        public void LogTrace(string message, params object[] args)
+        public void LogVerbose(string message, params object[] args)
         {
             Trace.TraceInformation(message, args);
         }
 
         /// <inheritdoc />
-        public void LogTrace(Exception exception, string message, params object[] args)
+        public void LogVerbose(Exception exception, string message, params object[] args)
         {
             var newMessage = message + Environment.NewLine + exception;
 

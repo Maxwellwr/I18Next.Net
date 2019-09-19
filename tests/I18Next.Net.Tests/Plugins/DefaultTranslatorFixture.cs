@@ -18,6 +18,7 @@ namespace I18Next.Net.Tests.Plugins
         public void SetUp()
         {
             _translator = new DefaultTranslator(_backend, null, _pluralResolver, _interpolator);
+            _options = new TranslationOptions { DefaultNamespace = "test" };
         }
 
         [TearDown]
@@ -34,6 +35,7 @@ namespace I18Next.Net.Tests.Plugins
         private IInterpolator _interpolator;
         private DefaultTranslator _translator;
         private ITranslationTree _translationTree;
+        private TranslationOptions _options;
 
         [OneTimeSetUp]
         public void OneTimeSetUp()
@@ -56,6 +58,40 @@ namespace I18Next.Net.Tests.Plugins
         }
 
         [Test]
+        public async Task TranslateAsync_CallMultiplePostProcessors_ShouldApplyPostProcessorsInOrder()
+        {
+            var postProcessor1 = Substitute.For<IPostProcessor>();
+            postProcessor1.Process("test", "translated", Arg.Any<IDictionary<string, object>>()).Returns("post-processed1");
+            postProcessor1.Keyword.Returns("testProcess1");
+            var postProcessor2 = Substitute.For<IPostProcessor>();
+            postProcessor2.Keyword.Returns("testProcess2");
+            var postProcessor3 = Substitute.For<IPostProcessor>();
+            postProcessor3.Process("test", "post-processed1", Arg.Any<IDictionary<string, object>>()).Returns("post-processed3");
+            postProcessor3.Keyword.Returns("testProcess3");
+
+            _translationTree.GetValue("test", Arg.Any<IDictionary<string, object>>()).Returns("translated");
+            _translator.PostProcessors.Add(postProcessor1);
+            _translator.PostProcessors.Add(postProcessor2);
+            _translator.PostProcessors.Add(postProcessor3);
+
+            var args = new { postProcess = new[] { "testProcess1", "testProcess3" } };
+            var result = await _translator.TranslateAsync("en-US", "test", args.ToDictionary(), _options);
+
+            result.Should().Be("post-processed3");
+
+            await _backend.Received(1).LoadNamespaceAsync("en-US", "test");
+            _translationTree.Received(1).GetValue("test", Arg.Any<IDictionary<string, object>>());
+            await _interpolator.ReceivedWithAnyArgs(1).InterpolateAsync(null, null, null, null);
+            _interpolator.Received(1).CanNest("translated");
+            await _interpolator.ReceivedWithAnyArgs(0).NestAsync(null, null, null, null);
+            _pluralResolver.ReceivedWithAnyArgs(0).GetPluralSuffix(null, 0);
+            _pluralResolver.ReceivedWithAnyArgs(0).NeedsPlural(null);
+            postProcessor1.Received(1).Process("test", "translated", Arg.Any<IDictionary<string, object>>());
+            postProcessor2.ReceivedWithAnyArgs(0).Process(null, null, null);
+            postProcessor3.Received(1).Process("test", "post-processed1", Arg.Any<IDictionary<string, object>>());
+        }
+
+        [Test]
         public async Task TranslateAsync_CustomPostProcessor_ShouldApplyPostProcessing()
         {
             var postProcessor = Substitute.For<IPostProcessor>();
@@ -66,7 +102,7 @@ namespace I18Next.Net.Tests.Plugins
             _translator.PostProcessors.Add(postProcessor);
 
             var args = new { postProcess = "testProcess" };
-            var result = await _translator.TranslateAsync("en-US", "test", "test", args.ToDictionary());
+            var result = await _translator.TranslateAsync("en-US", "test", args.ToDictionary(), _options);
 
             result.Should().Be("post-processed");
 
@@ -86,7 +122,7 @@ namespace I18Next.Net.Tests.Plugins
             _translationTree.GetValue("test", null).Returns("translated");
             _translator.AllowInterpolation = false;
 
-            var result = await _translator.TranslateAsync("en-US", "test", "test", null);
+            var result = await _translator.TranslateAsync("en-US", "test", null, _options);
 
             result.Should().Be("translated");
 
@@ -106,7 +142,7 @@ namespace I18Next.Net.Tests.Plugins
             _translator.AllowInterpolation = true;
 
             var args = new { interpolate = false };
-            var result = await _translator.TranslateAsync("en-US", "test", "test", args.ToDictionary());
+            var result = await _translator.TranslateAsync("en-US", "test", args.ToDictionary(), _options);
 
             result.Should().Be("translated");
 
@@ -125,7 +161,7 @@ namespace I18Next.Net.Tests.Plugins
             _translationTree.GetValue("test", null).Returns("translated");
             _translator.AllowNesting = false;
 
-            var result = await _translator.TranslateAsync("en-US", "test", "test", null);
+            var result = await _translator.TranslateAsync("en-US", "test", null, _options);
 
             result.Should().Be("translated");
 
@@ -145,7 +181,7 @@ namespace I18Next.Net.Tests.Plugins
             _translator.AllowNesting = true;
 
             var args = new { nest = false };
-            var result = await _translator.TranslateAsync("en-US", "test", "test", args.ToDictionary());
+            var result = await _translator.TranslateAsync("en-US", "test", args.ToDictionary(), _options);
 
             result.Should().Be("translated");
 
@@ -168,7 +204,7 @@ namespace I18Next.Net.Tests.Plugins
             _translator.PostProcessors.Add(postProcessor);
             _translator.AllowPostprocessing = false;
 
-            var result = await _translator.TranslateAsync("en-US", "test", "test", null);
+            var result = await _translator.TranslateAsync("en-US", "test", null, _options);
 
             result.Should().Be("translated");
 
@@ -193,7 +229,7 @@ namespace I18Next.Net.Tests.Plugins
             _translator.AllowPostprocessing = true;
 
             var args = new { applyPostProcessor = false };
-            var result = await _translator.TranslateAsync("en-US", "test", "test", args.ToDictionary());
+            var result = await _translator.TranslateAsync("en-US", "test", args.ToDictionary(), _options);
 
             result.Should().Be("translated");
 
@@ -222,7 +258,7 @@ namespace I18Next.Net.Tests.Plugins
             _translator.PostProcessors.Add(postProcessor2);
 
             var args = new { postProcess = "testProcess1" };
-            var result = await _translator.TranslateAsync("en-US", "test", "test", args.ToDictionary());
+            var result = await _translator.TranslateAsync("en-US", "test", args.ToDictionary(), _options);
 
             result.Should().Be("post-processed1");
 
@@ -252,7 +288,7 @@ namespace I18Next.Net.Tests.Plugins
             _translator.PostProcessors.Add(postProcessor2);
 
             var args = new { postProcess = "testProcess" };
-            var result = await _translator.TranslateAsync("en-US", "test", "test", args.ToDictionary());
+            var result = await _translator.TranslateAsync("en-US", "test", args.ToDictionary(), _options);
 
             result.Should().Be("post-processed2");
 
@@ -268,47 +304,13 @@ namespace I18Next.Net.Tests.Plugins
         }
 
         [Test]
-        public async Task TranslateAsync_CallMultiplePostProcessors_ShouldApplyPostProcessorsInOrder()
-        {
-            var postProcessor1 = Substitute.For<IPostProcessor>();
-            postProcessor1.Process("test", "translated", Arg.Any<IDictionary<string, object>>()).Returns("post-processed1");
-            postProcessor1.Keyword.Returns("testProcess1");
-            var postProcessor2 = Substitute.For<IPostProcessor>();
-            postProcessor2.Keyword.Returns("testProcess2");
-            var postProcessor3 = Substitute.For<IPostProcessor>();
-            postProcessor3.Process("test", "post-processed1", Arg.Any<IDictionary<string, object>>()).Returns("post-processed3");
-            postProcessor3.Keyword.Returns("testProcess3");
-
-            _translationTree.GetValue("test", Arg.Any<IDictionary<string, object>>()).Returns("translated");
-            _translator.PostProcessors.Add(postProcessor1);
-            _translator.PostProcessors.Add(postProcessor2);
-            _translator.PostProcessors.Add(postProcessor3);
-
-            var args = new { postProcess = new [] { "testProcess1", "testProcess3" } };
-            var result = await _translator.TranslateAsync("en-US", "test", "test", args.ToDictionary());
-
-            result.Should().Be("post-processed3");
-
-            await _backend.Received(1).LoadNamespaceAsync("en-US", "test");
-            _translationTree.Received(1).GetValue("test", Arg.Any<IDictionary<string, object>>());
-            await _interpolator.ReceivedWithAnyArgs(1).InterpolateAsync(null, null, null, null);
-            _interpolator.Received(1).CanNest("translated");
-            await _interpolator.ReceivedWithAnyArgs(0).NestAsync(null, null, null, null);
-            _pluralResolver.ReceivedWithAnyArgs(0).GetPluralSuffix(null, 0);
-            _pluralResolver.ReceivedWithAnyArgs(0).NeedsPlural(null);
-            postProcessor1.Received(1).Process("test", "translated", Arg.Any<IDictionary<string, object>>());
-            postProcessor2.ReceivedWithAnyArgs(0).Process(null, null, null);
-            postProcessor3.Received(1).Process("test", "post-processed1", Arg.Any<IDictionary<string, object>>());
-        }
-
-        [Test]
         public async Task TranslateAsync_ReplaceArgsInSubObject_ShouldUseSubObject()
         {
             _translationTree.GetValue("test", Arg.Any<IDictionary<string, object>>()).Returns("translated");
 
             var replaceArgs = new { value = "test" };
             var args = new { replace = replaceArgs };
-            var result = await _translator.TranslateAsync("en-US", "test", "test", args.ToDictionary());
+            var result = await _translator.TranslateAsync("en-US", "test", args.ToDictionary(), _options);
 
             result.Should().Be("translated");
 
@@ -328,8 +330,8 @@ namespace I18Next.Net.Tests.Plugins
         {
             _translationTree.GetValue("test", null).Returns("translated");
 
-            var result1 = await _translator.TranslateAsync("en-US", "test", "test", null);
-            var result2 = await _translator.TranslateAsync("en-US", "test", "test", null);
+            var result1 = await _translator.TranslateAsync("en-US", "test", null, _options);
+            var result2 = await _translator.TranslateAsync("en-US", "test", null, _options);
 
             result1.Should().Be("translated");
             result2.Should().Be("translated");
@@ -347,8 +349,9 @@ namespace I18Next.Net.Tests.Plugins
         public async Task TranslateAsync_UsingCiMode_ShouldReturnNamespaceAndKey()
         {
             _translationTree.GetValue("test", null).Returns("translated");
+            _options.DefaultNamespace = "testns";
 
-            var result = await _translator.TranslateAsync("cimode", "testns", "testkey", null);
+            var result = await _translator.TranslateAsync("cimode", "testkey", null, _options);
 
             result.Should().Be("testns:testkey");
 
@@ -367,7 +370,7 @@ namespace I18Next.Net.Tests.Plugins
             _translationTree.GetValue("test_male", Arg.Any<IDictionary<string, object>>()).Returns("translated");
 
             var args = new { context = "male" };
-            var result = await _translator.TranslateAsync("en-US", "test", "test", args.ToDictionary());
+            var result = await _translator.TranslateAsync("en-US", "test", args.ToDictionary(), _options);
 
             result.Should().Be("translated");
 
@@ -387,7 +390,7 @@ namespace I18Next.Net.Tests.Plugins
             _translationTree.GetValue("test", Arg.Any<IDictionary<string, object>>()).Returns("translated");
 
             var args = new { context = "male" };
-            var result = await _translator.TranslateAsync("en-US", "test", "test", args.ToDictionary());
+            var result = await _translator.TranslateAsync("en-US", "test", args.ToDictionary(), _options);
 
             result.Should().Be("translated");
 
@@ -407,7 +410,7 @@ namespace I18Next.Net.Tests.Plugins
             _translationTree.GetValue("test_2", Arg.Any<IDictionary<string, object>>()).Returns("translated");
 
             var args = new { count = 2 };
-            var result = await _translator.TranslateAsync("en-US", "test", "test", args.ToDictionary());
+            var result = await _translator.TranslateAsync("en-US", "test", args.ToDictionary(), _options);
 
             result.Should().Be("translated");
 
@@ -426,7 +429,7 @@ namespace I18Next.Net.Tests.Plugins
             _translationTree.GetValue("test_male_2", Arg.Any<IDictionary<string, object>>()).Returns("translated");
 
             var args = new { count = 2, context = "male" };
-            var result = await _translator.TranslateAsync("en-US", "test", "test", args.ToDictionary());
+            var result = await _translator.TranslateAsync("en-US", "test", args.ToDictionary(), _options);
 
             result.Should().Be("translated");
 
@@ -448,7 +451,7 @@ namespace I18Next.Net.Tests.Plugins
             _translationTree.GetValue("test_male_2", Arg.Any<IDictionary<string, object>>()).Returns((string) null);
 
             var args = new { count = 2, context = "male" };
-            var result = await _translator.TranslateAsync("en-US", "test", "test", args.ToDictionary());
+            var result = await _translator.TranslateAsync("en-US", "test", args.ToDictionary(), _options);
 
             result.Should().Be("translated");
 
@@ -473,7 +476,7 @@ namespace I18Next.Net.Tests.Plugins
             _translationTree.GetValue("test_male_2", Arg.Any<IDictionary<string, object>>()).Returns((string) null);
 
             var args = new { count = 2, context = "male" };
-            var result = await _translator.TranslateAsync("en-US", "test", "test", args.ToDictionary());
+            var result = await _translator.TranslateAsync("en-US", "test", args.ToDictionary(), _options);
 
             result.Should().Be("translated");
 
@@ -498,7 +501,7 @@ namespace I18Next.Net.Tests.Plugins
             _translationTree.GetValue("test_male_2", Arg.Any<IDictionary<string, object>>()).Returns((string) null);
 
             var args = new { count = 2, context = "male" };
-            var result = await _translator.TranslateAsync("en-US", "test", "test", args.ToDictionary());
+            var result = await _translator.TranslateAsync("en-US", "test", args.ToDictionary(), _options);
 
             result.Should().Be("translated");
 
@@ -521,7 +524,7 @@ namespace I18Next.Net.Tests.Plugins
             _translationTree.GetValue("test", Arg.Any<IDictionary<string, object>>()).Returns("translated");
 
             var args = new { count = 2 };
-            var result = await _translator.TranslateAsync("en-US", "test", "test", args.ToDictionary());
+            var result = await _translator.TranslateAsync("en-US", "test", args.ToDictionary(), _options);
 
             result.Should().Be("translated");
 
@@ -540,7 +543,7 @@ namespace I18Next.Net.Tests.Plugins
         {
             _translationTree.GetValue("test", null).Returns("translated");
 
-            var result = await _translator.TranslateAsync("en-US", "test", "test", null);
+            var result = await _translator.TranslateAsync("en-US", "test", null, _options);
 
             result.Should().Be("translated");
 
@@ -554,11 +557,214 @@ namespace I18Next.Net.Tests.Plugins
         }
 
         [Test]
+        public async Task TranslateAsync_WithMissingKey_ShouldRaiseMissingKeyEvent()
+        {
+            _translationTree.GetValue("test", null).Returns((string) null);
+
+            var missingKeyCalls = 0;
+
+            _translator.MissingKey += (sender, args) =>
+            {
+                args.Key.Should().Be("test");
+                args.Namespace.Should().Be("test");
+                args.Language.Should().Be("en-US");
+                args.PossibleKeys.Should().BeEquivalentTo("test");
+                missingKeyCalls++;
+            };
+
+            var result = await _translator.TranslateAsync("en-US", "test", null, _options);
+
+            result.Should().Be("test");
+            missingKeyCalls.Should().Be(1);
+
+            await _backend.Received(1).LoadNamespaceAsync("en-US", "test");
+            _translationTree.Received(1).GetValue("test", null);
+            await _interpolator.ReceivedWithAnyArgs(0).InterpolateAsync(null, null, null, null);
+            _interpolator.Received(0).CanNest("translated");
+            await _interpolator.ReceivedWithAnyArgs(0).NestAsync(null, null, null, null);
+            _pluralResolver.ReceivedWithAnyArgs(0).GetPluralSuffix(null, 0);
+            _pluralResolver.ReceivedWithAnyArgs(0).NeedsPlural(null);
+        }
+
+        [Test]
+        public async Task TranslateAsync_WithMissingKeyAndContext_ShouldRaiseMissingKeyEventWithPossibleContextKeys()
+        {
+            var arguments = new Dictionary<string, object>
+            {
+                { "context", "ctx" }
+            };
+
+            _translationTree.GetValue("test", arguments).Returns((string) null);
+            _translationTree.GetValue("test_ctx", arguments).Returns((string) null);
+
+            var missingKeyCalls = 0;
+
+            _translator.MissingKey += (sender, args) =>
+            {
+                args.Key.Should().Be("test");
+                args.Namespace.Should().Be("test");
+                args.Language.Should().Be("en-US");
+                args.PossibleKeys.Should().BeEquivalentTo("test_ctx", "test");
+                missingKeyCalls++;
+            };
+
+            var result = await _translator.TranslateAsync("en-US", "test", arguments, _options);
+
+            result.Should().Be("test");
+            missingKeyCalls.Should().Be(1);
+
+            await _backend.Received(1).LoadNamespaceAsync("en-US", "test");
+            _translationTree.Received(1).GetValue("test", arguments);
+            await _interpolator.ReceivedWithAnyArgs(0).InterpolateAsync(null, null, null, null);
+            _interpolator.Received(0).CanNest("translated");
+            await _interpolator.ReceivedWithAnyArgs(0).NestAsync(null, null, null, null);
+            _pluralResolver.ReceivedWithAnyArgs(0).GetPluralSuffix(null, 0);
+            _pluralResolver.ReceivedWithAnyArgs(0).NeedsPlural(null);
+        }
+
+        [Test]
+        public async Task TranslateAsync_WithMissingKeyAndContextAndPlural_ShouldRaiseMissingKeyEventWithPossibleContextAndPluralKeys()
+        {
+            var arguments = new Dictionary<string, object>
+            {
+                { "context", "ctx" },
+                { "count", 2 }
+            };
+
+            _translationTree.GetValue("test", arguments).Returns((string) null);
+            _translationTree.GetValue("test_2", arguments).Returns((string) null);
+            _translationTree.GetValue("test_ctx", arguments).Returns((string) null);
+            _translationTree.GetValue("test_ctx_2", arguments).Returns((string) null);
+
+            var missingKeyCalls = 0;
+
+            _translator.MissingKey += (sender, args) =>
+            {
+                args.Key.Should().Be("test");
+                args.Namespace.Should().Be("test");
+                args.Language.Should().Be("en-US");
+                args.PossibleKeys.Should().BeEquivalentTo("test_ctx_2", "test_ctx", "test_2", "test");
+                missingKeyCalls++;
+            };
+            var result = await _translator.TranslateAsync("en-US", "test", arguments, _options);
+
+            result.Should().Be("test");
+            missingKeyCalls.Should().Be(1);
+
+            await _backend.Received(1).LoadNamespaceAsync("en-US", "test");
+            _translationTree.Received(1).GetValue("test", arguments);
+            await _interpolator.ReceivedWithAnyArgs(0).InterpolateAsync(null, null, null, null);
+            _interpolator.Received(0).CanNest("translated");
+            await _interpolator.ReceivedWithAnyArgs(0).NestAsync(null, null, null, null);
+            _pluralResolver.ReceivedWithAnyArgs(1).GetPluralSuffix(null, 0);
+            _pluralResolver.ReceivedWithAnyArgs(1).NeedsPlural(null);
+        }
+
+        [Test]
+        public async Task TranslateAsync_WithMissingKeyAndMultipleMissingKeyHandlers_ShouldCallMissingKeyHandlers()
+        {
+            _translationTree.GetValue("test", null).Returns((string) null);
+
+            var missingKeyHandlerA = Substitute.For<IMissingKeyHandler>();
+            missingKeyHandlerA
+                .HandleMissingKeyAsync(_translator,
+                    Arg.Is<MissingKeyEventArgs>(x => x.Key == "test" && x.Language == "en-US" && x.Namespace == "test"))
+                .Returns(Task.CompletedTask);
+
+            var missingKeyHandlerB = Substitute.For<IMissingKeyHandler>();
+            missingKeyHandlerA
+                .HandleMissingKeyAsync(_translator,
+                    Arg.Is<MissingKeyEventArgs>(x => x.Key == "test" && x.Language == "en-US" && x.Namespace == "test"))
+                .Returns(Task.CompletedTask);
+
+            _translator.MissingKeyHandlers.Add(missingKeyHandlerA);
+            _translator.MissingKeyHandlers.Add(missingKeyHandlerB);
+
+            var result = await _translator.TranslateAsync("en-US", "test", null, _options);
+
+            result.Should().Be("test");
+
+            await _backend.Received(1).LoadNamespaceAsync("en-US", "test");
+            _translationTree.Received(1).GetValue("test", null);
+            await missingKeyHandlerA.Received(1).HandleMissingKeyAsync(_translator, Arg.Any<MissingKeyEventArgs>());
+            await missingKeyHandlerB.Received(1).HandleMissingKeyAsync(_translator, Arg.Any<MissingKeyEventArgs>());
+            await _interpolator.ReceivedWithAnyArgs(0).InterpolateAsync(null, null, null, null);
+            _interpolator.Received(0).CanNest("translated");
+            await _interpolator.ReceivedWithAnyArgs(0).NestAsync(null, null, null, null);
+            _pluralResolver.ReceivedWithAnyArgs(0).GetPluralSuffix(null, 0);
+            _pluralResolver.ReceivedWithAnyArgs(0).NeedsPlural(null);
+        }
+
+        [Test]
+        public async Task TranslateAsync_WithMissingKeyAndOneMissingKeyHandler_ShouldCallMissingKeyHandler()
+        {
+            _translationTree.GetValue("test", null).Returns((string) null);
+
+            var missingKeyHandler = Substitute.For<IMissingKeyHandler>();
+            missingKeyHandler
+                .HandleMissingKeyAsync(_translator,
+                    Arg.Is<MissingKeyEventArgs>(x => x.Key == "test" && x.Language == "en-US" && x.Namespace == "test"))
+                .Returns(Task.CompletedTask);
+
+            _translator.MissingKeyHandlers.Add(missingKeyHandler);
+
+            var result = await _translator.TranslateAsync("en-US", "test", null, _options);
+
+            result.Should().Be("test");
+
+            await _backend.Received(1).LoadNamespaceAsync("en-US", "test");
+            _translationTree.Received(1).GetValue("test", null);
+            await missingKeyHandler.Received(1).HandleMissingKeyAsync(_translator, Arg.Any<MissingKeyEventArgs>());
+            await _interpolator.ReceivedWithAnyArgs(0).InterpolateAsync(null, null, null, null);
+            _interpolator.Received(0).CanNest("translated");
+            await _interpolator.ReceivedWithAnyArgs(0).NestAsync(null, null, null, null);
+            _pluralResolver.ReceivedWithAnyArgs(0).GetPluralSuffix(null, 0);
+            _pluralResolver.ReceivedWithAnyArgs(0).NeedsPlural(null);
+        }
+
+        [Test]
+        public async Task TranslateAsync_WithMissingKeyAndPlural_ShouldRaiseMissingKeyEventWithPossiblePluralKeys()
+        {
+            var arguments = new Dictionary<string, object>
+            {
+                { "count", 2 }
+            };
+
+            _translationTree.GetValue("test", arguments).Returns((string) null);
+            _translationTree.GetValue("test_2", arguments).Returns((string) null);
+
+            var missingKeyCalls = 0;
+
+            _translator.MissingKey += (sender, args) =>
+            {
+                args.Key.Should().Be("test");
+                args.Namespace.Should().Be("test");
+                args.Language.Should().Be("en-US");
+                args.PossibleKeys.Should().BeEquivalentTo("test_2", "test");
+                missingKeyCalls++;
+            };
+
+            var result = await _translator.TranslateAsync("en-US", "test", arguments, _options);
+
+            result.Should().Be("test");
+            missingKeyCalls.Should().Be(1);
+
+            await _backend.Received(1).LoadNamespaceAsync("en-US", "test");
+            _translationTree.Received(1).GetValue("test", arguments);
+            await _interpolator.ReceivedWithAnyArgs(0).InterpolateAsync(null, null, null, null);
+            _interpolator.Received(0).CanNest("translated");
+            await _interpolator.ReceivedWithAnyArgs(0).NestAsync(null, null, null, null);
+            _pluralResolver.ReceivedWithAnyArgs(1).GetPluralSuffix(null, 0);
+            _pluralResolver.ReceivedWithAnyArgs(1).NeedsPlural(null);
+        }
+
+        [Test]
         public async Task TranslateAsync_WithOtherThanDefaultNsAndSimpleString_ShouldTranslateUsingTheSpecifiedNamespace()
         {
             _translationTree.GetValue("test", null).Returns("translated");
+            _options.DefaultNamespace = "other";
 
-            var result = await _translator.TranslateAsync("en-US", "other", "test:test", null);
+            var result = await _translator.TranslateAsync("en-US", "test:test", null, _options);
 
             result.Should().Be("translated");
 

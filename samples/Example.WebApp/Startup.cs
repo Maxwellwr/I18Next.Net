@@ -1,5 +1,5 @@
-﻿using I18Next.Net.AspNetCore;
-using I18Next.Net.Backends;
+﻿using System;
+using I18Next.Net.AspNetCore;
 using I18Next.Net.Extensions;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
@@ -42,7 +42,7 @@ namespace Example.WebApp
         public void ConfigureServices(IServiceCollection services)
         {
             // Option 1: Simple setup for AspNetCore using the default configuration
-            services.AddI18NextLocalization(i18n => i18n.IntegrateToAspNetCore());
+            services.AddI18NextLocalization(i18N => i18N.IntegrateToAspNetCore());
 
             // Option 2: Customize the locales location in order to use the same json files on the client side. 
             // services.AddI18NextLocalization(i18n =>
